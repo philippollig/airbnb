@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ferienhaus Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root {
+  --primary: #1a1a1a;
+  --accent: #34C759;
+  --primary-light: #f5f5f7;
+  --guest: rgba(52,199,89,0.08);
+  --personal: rgba(255,149,0,0.08);
+  --blocked: rgba(142,142,147,0.08);
+  --family: rgba(88,86,214,0.08);
+  --danger: #FF3B30;
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --text: #1a1a1a;
+  --muted: #8E8E93;
+  --border: #e5e5ea;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+nav { background: #1d1d1f; padding: 0 20px; display: flex; align-items: center; gap: 0; position: sticky; top: 0; z-index: 100; }
+nav .spacer { flex: 1; }
+nav .logout { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+nav .logout:hover { background: rgba(255,255,255,0.25); }
+nav h1 { color: white; font-size: 16px; padding: 12px 20px 12px 0; border-right: 1px solid rgba(255,255,255,0.2); margin-right: 10px; }
+nav button { background: none; border: none; color: rgba(255,255,255,0.7); padding: 12px 16px; cursor: pointer; font-size: 13px; transition: all 0.2s; border-bottom: 3px solid transparent; }
+nav button:hover { color: white; background: rgba(255,255,255,0.1); }
+nav button.active { color: white; border-bottom-color: white; font-weight: 600; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.card { background: var(--card); border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.card h2 { font-size: 18px; color: var(--text); font-weight: 700; margin-bottom: 16px; }
+.card h3 { font-size: 14px; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.form-group input, .form-group select { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: #fafbfc; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #34C759; box-shadow: 0 0 0 3px rgba(52,199,89,0.12); background: white; }
+.form-group .computed { background: #f0f0f5; font-weight: 600; border: 1px solid #e5e5ea; color: var(--text); }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #fafbfc; color: #8E8E93; padding: 10px 12px; text-align: left; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e5e5ea; }
+td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+tr:hover { background: rgba(0,0,0,0.02); }
+tr.guest { background: var(--guest); }
+tr.personal { background: var(--personal); }
+tr.blocked { background: var(--blocked); }
+tr.family { background: var(--family); }
+
+.btn { padding: 8px 16px; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+.btn-primary { background: #34C759; color: white; border-radius: 8px; }
+.btn-primary:hover { background: #2db84e; }
+.btn-danger { background: #FF3B30; color: white; border-radius: 8px; }
+.btn-danger:hover { background: #e0332a; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+.upcoming { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.upcoming h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #8E8E93; font-weight: 600; margin-bottom: 14px; }
+.upcoming-cards { display: flex; gap: 16px; overflow-x: auto; }
+.upcoming-card { min-width: 240px; padding: 16px; border-radius: 10px; border-left: 4px solid #34C759; background: #f9fafb; }
+.upcoming-card.type-P { border-left-color: #FF9500; }
+.upcoming-card.type-F { border-left-color: #5856D6; }
+.upcoming-card.type-B { border-left-color: #8E8E93; }
+.upcoming-card .uc-guest { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.upcoming-card .uc-type { font-size: 11px; font-weight: 500; color: #8E8E93; text-transform: uppercase; letter-spacing: 0.3px; }
+.upcoming-card .uc-dates { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.upcoming-card .uc-details { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; gap: 12px; }
+.upcoming-card .uc-details span { display: flex; align-items: center; gap: 4px; }
+.upcoming-empty { color: #8E8E93; font-size: 14px; }
+
+.calendar-month { margin-bottom: 24px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.calendar-month h3 { font-size: 15px; font-weight: 600; color: var(--text); padding: 14px 18px; margin-bottom: 0; text-transform: none; letter-spacing: 0; background: #fafbfc; border-bottom: 1px solid #f0f0f0; }
+.calendar-grid { display: grid; padding: 4px 8px 8px; gap: 1px; }
+.calendar-grid.cols-28 { grid-template-columns: repeat(28, 1fr); }
+.calendar-grid.cols-29 { grid-template-columns: repeat(29, 1fr); }
+.calendar-grid.cols-30 { grid-template-columns: repeat(30, 1fr); }
+.calendar-grid.cols-31 { grid-template-columns: repeat(31, 1fr); }
+.cal-cell { padding: 6px 2px; text-align: center; font-size: 11px; min-height: 28px; border-radius: 6px; transition: background 0.15s; }
+.cal-cell.day-num { font-weight: 600; font-size: 12px; color: #333; }
+.cal-cell.day-name { color: #aaa; font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
+.cal-cell.weekend { color: #999; }
+.cal-cell.status-G { background: #34C759; color: white; font-weight: 600; border-radius: 6px; }
+.cal-cell.status-P { background: #FF9500; color: white; font-weight: 600; border-radius: 6px; }
+.cal-cell.status-B { background: #8E8E93; color: white; border-radius: 6px; }
+.cal-cell.status-F { background: #5856D6; color: white; font-weight: 600; border-radius: 6px; }
+.cal-cell.guest-name { font-size: 8px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px; }
+.cal-cell.gap { background: #FF3B30; color: white; font-weight: 600; border-radius: 6px; }
+
+.dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.dash-card { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.dash-card .dash-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #8E8E93; font-weight: 600; margin-bottom: 6px; }
+.dash-card .dash-value { font-size: 24px; font-weight: 700; color: var(--text); }
+.dash-card .dash-value.status-free { color: #34C759; }
+.dash-card .dash-value.status-occupied { color: #FF9500; }
+.dash-card .dash-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.summary-card { background: white; border-radius: 12px; padding: 18px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+.summary-card .label { font-size: 11px; color: #8E8E93; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.summary-card .value { font-size: 22px; font-weight: 700; color: var(--text); margin-top: 6px; }
+.summary-card .value.negative { color: #dc3545; }
+.summary-card .value.positive { color: #198754; }
+
+.legend { display: flex; gap: 20px; margin-bottom: 20px; font-size: 13px; font-weight: 500; }
+.legend span { display: flex; align-items: center; gap: 8px; }
+.legend-dot { width: 16px; height: 16px; border-radius: 5px; }
+
+.hidden { visibility: collapse; height: 0; overflow: clip; padding: 0; margin: 0; border: 0; }
+#login-screen { position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: url('https://raw.githubusercontent.com/philippollig/airbnb/main/front_page.jpg') center/cover no-repeat; }
+#login-screen::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,0.3); }
+#login-box { position: relative; z-index: 1; background: rgba(255,255,255,0.92); backdrop-filter: blur(12px); border-radius: 16px; padding: 48px 40px; width: 360px; box-shadow: 0 12px 48px rgba(0,0,0,0.3); text-align: center; }
+#login-box h2 { color: var(--text); margin-bottom: 8px; font-size: 24px; font-weight: 700; }
+#login-box .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+#login-box input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; margin-bottom: 14px; background: rgba(255,255,255,0.8); }
+#login-box input:focus { outline: none; border-color: #34C759; box-shadow: 0 0 0 3px rgba(52,199,89,0.15); }
+#login-box button { width: 100%; padding: 12px; margin-top: 8px; font-size: 15px; border-radius: 6px; }
+#login-error { color: #dc3545; font-size: 12px; margin-top: 10px; }
+.btn-edit { background: #5856D6; color: white; }
+.btn-edit:hover { background: #4a48c4; }
+
+@media (max-width: 768px) {
+  .form-grid { grid-template-columns: 1fr; }
+  nav { flex-wrap: wrap; }
+  nav h1 { width: 100%; border-right: none; border-bottom: 1px solid rgba(255,255,255,0.2); margin-right: 0; }
+}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div id="login-box">
+    <h2>Ferienhaus Tracker</h2>
+    <p class="subtitle">Bagnols-en-For&ecirc;t &middot; Provence</p>
+    <input type="text" id="login-user" placeholder="Benutzername" onkeydown="if(event.key==='Enter')doLogin()">
+    <input type="password" id="login-pass" placeholder="Passwort" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn btn-primary" onclick="doLogin()">Anmelden</button>
+    <div id="login-error"></div>
+  </div>
+</div>
+
+<nav>
+  <h1>Ferienhaus Tracker</h1>
+  <button class="active" onclick="showTab('kalender', this)">Kalender</button>
+  <button onclick="showTab('buchungen', this)">Buchungen</button>
+  <button onclick="showTab('monatlich', this)">Monatlich</button>
+  <button onclick="showTab('liquiditaet', this)">Liquidit&auml;t</button>
+  <button onclick="showTab('kontostand', this)">Kontostand</button>
+  <button onclick="showTab('finanzierung', this)">Finanzierung</button>
+  <button onclick="showTab('steuer', this)">Steuer</button>
+  <div class="spacer"></div>
+  <button class="logout" onclick="doLogout()">Abmelden</button>
+</nav>
+
+<div class="container">
+
+<div id="tab-finanzierung" class="tab-content">
+  <div class="card">
+    <h2>Kaufdetails</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Kaufpreis (&euro;)</label><input type="number" id="kaufpreis" value="592000" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Umbaukosten (&euro;)</label><input type="number" id="umbaukosten" value="0" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Notarkosten (%)</label><input type="number" id="notarpct" value="7.81" step="0.01" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Notarkosten (&euro;)</label><input type="text" id="notareur" class="computed" readonly></div>
+      <div class="form-group"><label>Total Kaufkosten (&euro;)</label><input type="text" id="totalkauf" class="computed" readonly></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Kredit 1 (LBS)</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Kreditbetrag (&euro;)</label><input type="number" id="kredit1" value="383000" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Zinssatz (%)</label><input type="number" id="zins1" value="4.34" step="0.01" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Tilgung (%)</label><input type="number" id="tilgung1" value="2" step="0.1" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Monatliche Belastung (&euro;)</label><input type="text" id="monat1" class="computed" readonly></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Kredit 2 (Kapitalbeschaffung)</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Kreditbetrag (&euro;)</label><input type="number" id="kredit2" value="220000" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Zinssatz (%)</label><input type="number" id="zins2" value="3.87" step="0.01" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Tilgung (%)</label><input type="number" id="tilgung2" value="2" step="0.1" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Monatliche Belastung (&euro;)</label><input type="text" id="monat2" class="computed" readonly></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Laufende Kosten (monatlich)</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Gesamte Kreditbelastung (&euro;)</label><input type="text" id="kreditgesamt" class="computed" readonly></div>
+      <div class="form-group"><label>Strom/Wasser (&euro;)</label><input type="number" id="strom" value="150" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Grundsteuer / taxe fonci&egrave;re (&euro;)</label><input type="number" id="grundsteuer" value="200" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Wohnsteuer / taxe d'habitation (&euro;)</label><input type="number" id="wohnsteuer" value="0" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Versicherung (&euro;)</label><input type="number" id="versicherung" value="80" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Instandhaltungsr&uuml;cklage (&euro;)</label><input type="number" id="instandhaltung" value="100" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Airbnb Geb&uuml;hr (%)</label><input type="number" id="airbnbfee" value="3" step="0.1" onchange="saveSettings(); recalc()"></div>
+      <div class="form-group"><label>Reinigung pro Wechsel (&euro;)</label><input type="number" id="reinigung" value="80" onchange="saveSettings(); recalc()"></div>
+    </div>
+    <div class="form-grid" style="margin-top:16px">
+      <div class="form-group"><label>Fixkosten/Monat (ohne Kredit)</label><input type="text" id="fixohnekredit" class="computed" readonly></div>
+      <div class="form-group"><label><strong>Gesamtkosten/Monat</strong></label><input type="text" id="gesamtmonat" class="computed" readonly style="font-size:15px"></div>
+    </div>
+  </div>
+</div>
+
+
+<div id="tab-buchungen" class="tab-content">
+  <div class="card">
+    <h2>Neue Buchung</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Typ</label>
+        <select id="b-typ"><option value="Gast">Gast</option><option value="Personal">Personal</option><option value="Family &amp; Friends">Family &amp; Friends</option><option value="Blockiert">Blockiert</option></select>
+      </div>
+      <div class="form-group"><label>Quelle</label>
+        <select id="b-quelle"><option value="Airbnb">Airbnb (3%)</option><option value="Booking">Booking.com (15%)</option><option value="Direkt">Direkt (0%)</option></select>
+      </div>
+      <div class="form-group"><label>Gast</label><input type="text" id="b-gast"></div>
+      <div class="form-group"><label>Anzahl G&auml;ste</label><input type="number" id="b-gaeste" value="2" min="1" onchange="updateTaxe()"></div>
+      <div class="form-group"><label>Check-In</label><input type="date" id="b-checkin" onchange="autoCheckout(); suggestPrice()"></div>
+      <div class="form-group"><label>Check-Out</label><input type="date" id="b-checkout" onchange="updateTaxe()"></div>
+      <div class="form-group"><label>Preis/Nacht (&euro;) <span id="price-hint" style="color:#34C759;font-size:10px"></span></label><input type="number" id="b-preis" value="0"></div>
+      <div class="form-group"><label>Reinigung (&euro;)</label><input type="number" id="b-reinigung" value="80"></div>
+      <div class="form-group"><label>Taxe de s&eacute;jour (&euro;)</label><input type="text" id="b-taxe" class="computed" readonly value="0,00 &euro;"></div>
+      <div class="form-group"><label>Status</label>
+        <select id="b-status"><option>Best&auml;tigt</option><option>Angefragt</option><option>Abgeschlossen</option><option>Storniert</option></select>
+      </div>
+      <div class="form-group"><label>Notizen</label><input type="text" id="b-notizen"></div>
+    </div>
+    <div style="margin-top:14px" id="booking-buttons">
+      <button class="btn btn-primary" id="btn-add" onclick="addBooking()">Buchung hinzuf&uuml;gen</button>
+      <button class="btn btn-primary hidden" id="btn-save" onclick="saveEditedBooking()">Speichern</button>
+      <button class="btn hidden" id="btn-cancel" onclick="cancelEdit()" style="margin-left:8px">Abbrechen</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Alle Buchungen</h2>
+    <div style="overflow-x:auto">
+      <table id="bookings-table">
+        <thead>
+          <tr><th>#</th><th>Typ</th><th>Quelle</th><th>Gast</th><th>Check-In</th><th>Check-Out</th><th>N&auml;chte</th><th>&euro;/Nacht</th><th>Brutto</th><th>Geb&uuml;hr</th><th>Taxe</th><th>Netto</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="tab-kalender" class="tab-content active">
+  <div id="dashboard-block" class="dashboard"></div>
+  <div id="upcoming-block"></div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <h2 style="font-size:22px;font-weight:700;color:var(--text);margin:0">Belegungskalender</h2>
+    <div class="legend" style="margin-bottom:0">
+      <span><div class="legend-dot" style="background:#34C759"></div> Gast</span>
+      <span><div class="legend-dot" style="background:#FF9500"></div> Personal</span>
+      <span><div class="legend-dot" style="background:#5856D6"></div> Family &amp; Friends</span>
+      <span><div class="legend-dot" style="background:#8E8E93"></div> Blockiert</span>
+      <span><div class="legend-dot" style="background:#FF3B30"></div> L&uuml;cke</span>
+    </div>
+  </div>
+  <div id="calendar-container"></div>
+</div>
+
+<div id="tab-monatlich" class="tab-content">
+  <div class="summary-row" id="annual-summary"></div>
+  <div class="card">
+    <h2>Monatliche &Uuml;bersicht</h2>
+    <div style="overflow-x:auto">
+      <table id="monthly-table">
+        <thead><tr><th>Monat</th><th>Jahr</th><th>Gast-N&auml;chte</th><th>Pers. N&auml;chte</th><th>Verf&uuml;gbar</th><th>Auslastung</th><th>Brutto</th><th>Var. Kosten</th><th>Netto</th><th>Fixkosten</th><th>Gewinn</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="tab-liquiditaet" class="tab-content">
+  <div class="card">
+    <h2>Liquidit&auml;tsplanung (ab Sep 2026)</h2>
+    <div class="form-grid" style="margin-bottom:16px">
+      <div class="form-group"><label>Startkapital (&euro;)</label><input type="number" id="startkapital" value="49000" onchange="saveSettings(); recalc()"></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="liquidity-table">
+        <thead><tr><th>Monat</th><th>Einnahmen</th><th>Ausgaben</th><th>Sonstige Ausgaben</th><th>Saldo</th><th>Kumuliert</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="tab-kontostand" class="tab-content">
+  <div class="card">
+    <h2>Kontostand</h2>
+    <div class="summary-row" id="account-summary"></div>
+    <div style="margin-top:12px"><button class="btn btn-primary" onclick="exportExcel()">Als Excel exportieren</button></div>
+  </div>
+  <div class="card">
+    <h2>Rechnung hochladen (PDF)</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:12px">PDF-Rechnung hochladen &mdash; Datum, Betrag, Beschreibung und Kategorie werden automatisch erkannt. Wird automatisch im GitHub-Repository gespeichert.</p>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>PDF ausw&auml;hlen</label>
+        <input type="file" id="pdf-upload" accept=".pdf" onchange="analyzePdf(this.files[0])">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <input type="text" id="pdf-status" class="computed" readonly value="Keine Datei">
+      </div>
+      <div class="form-group">
+        <label>GitHub Token (PAT)</label>
+        <input type="password" id="gh-token" placeholder="ghp_..." onchange="saveSettings()">
+      </div>
+      <div class="form-group">
+        <label>Repository</label>
+        <input type="text" id="gh-repo" value="philippollig/airbnb" onchange="saveSettings()">
+      </div>
+    </div>
+    <div id="gh-files" style="margin-top:14px"></div>
+  </div>
+  <div class="card">
+    <h2>Ausgabe hinzuf&uuml;gen</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Datum</label><input type="date" id="e-datum"></div>
+      <div class="form-group"><label>Kategorie</label>
+        <select id="e-kategorie"><option>M&ouml;bel</option><option>Renovierung</option><option>Inventory</option><option>Sonstiges</option></select>
+      </div>
+      <div class="form-group"><label>Beschreibung</label><input type="text" id="e-beschreibung"></div>
+      <div class="form-group"><label>Betrag (&euro;)</label><input type="number" id="e-betrag" value="0"></div>
+    </div>
+    <div style="margin-top:14px"><button class="btn btn-primary" onclick="addExpense()">Ausgabe hinzuf&uuml;gen</button></div>
+  </div>
+  <div class="card">
+    <h2>Einnahmen &amp; Ausgaben</h2>
+    <div style="overflow-x:auto">
+      <table id="account-table">
+        <thead><tr><th>Datum</th><th>Typ</th><th>Kategorie</th><th>Beschreibung</th><th>Einnahme</th><th>Ausgabe</th><th>Saldo</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="tab-steuer" class="tab-content">
+  <div class="card">
+    <h2>Steuererkl&auml;rung &mdash; R&eacute;gime R&eacute;el</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:16px">Zusammenfassung der Einnahmen und abzugsf&auml;higen Kosten f&uuml;r die Erkl&auml;rung der revenus fonciers (Formular 2044).</p>
+    <div class="form-grid" style="margin-bottom:16px">
+      <div class="form-group"><label>Steuerjahr</label>
+        <select id="tax-year" onchange="renderTaxReport()"><option value="2026">2026</option><option value="2027">2027</option></select>
+      </div>
+      <div class="form-group"><label><button class="btn btn-primary" onclick="exportTaxReport()">Steuerbericht exportieren</button></label></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Revenus Fonciers (Mieteinnahmen)</h3>
+    <div id="tax-revenue"></div>
+  </div>
+  <div class="card">
+    <h3>Charges D&eacute;ductibles (Abzugsf&auml;hige Kosten)</h3>
+    <div id="tax-charges"></div>
+  </div>
+  <div class="card">
+    <h3>R&eacute;sultat Foncier</h3>
+    <div id="tax-result"></div>
+  </div>
+  <div class="card">
+    <h3>Taxe de S&eacute;jour &mdash; Abf&uuml;hrung an Gemeinde</h3>
+    <div id="tax-sejour"></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+var MONTHS_DE = ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+var DAYS_IN_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+var bookings = JSON.parse(localStorage.getItem('fh_bookings') || '[]');
+var expenses = JSON.parse(localStorage.getItem('fh_expenses') || '[]');
+var settings = JSON.parse(localStorage.getItem('fh_settings') || 'null');
+
+function init() {
+  if (settings) {
+    var fields = ['kaufpreis','umbaukosten','notarpct','kredit1','zins1','tilgung1','kredit2','zins2','tilgung2','strom','grundsteuer','wohnsteuer','versicherung','instandhaltung','airbnbfee','reinigung','startkapital'];
+    fields.forEach(function(f) { if (settings[f] !== undefined) document.getElementById(f).value = settings[f]; });
+    if (settings.ghToken) document.getElementById('gh-token').value = settings.ghToken;
+    if (settings.ghRepo) document.getElementById('gh-repo').value = settings.ghRepo;
+  }
+  recalc();
+  listGhFiles();
+}
+
+function saveSettings() {
+  var fields = ['kaufpreis','umbaukosten','notarpct','kredit1','zins1','tilgung1','kredit2','zins2','tilgung2','strom','grundsteuer','wohnsteuer','versicherung','instandhaltung','airbnbfee','reinigung','startkapital'];
+  settings = {};
+  fields.forEach(function(f) { settings[f] = parseFloat(document.getElementById(f).value) || 0; });
+  settings.ghToken = document.getElementById('gh-token').value;
+  settings.ghRepo = document.getElementById('gh-repo').value;
+  localStorage.setItem('fh_settings', JSON.stringify(settings));
+}
+
+function getVal(id) { return parseFloat(document.getElementById(id).value) || 0; }
+function fmt(n) { return n.toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' \u20ac'; }
+function pct(n) { return (n * 100).toFixed(1) + '%'; }
+
+function getFixMonat() {
+  var k1 = getVal('kredit1'), z1 = getVal('zins1')/100, t1 = getVal('tilgung1')/100;
+  var k2 = getVal('kredit2'), z2 = getVal('zins2')/100, t2 = getVal('tilgung2')/100;
+  var kreditGesamt = k1*(z1+t1)/12 + k2*(z2+t2)/12;
+  var fixOhne = getVal('strom') + getVal('grundsteuer') + getVal('wohnsteuer') + getVal('versicherung') + getVal('instandhaltung');
+  return kreditGesamt + fixOhne;
+}
+
+function recalc() {
+  var kaufpreis = getVal('kaufpreis');
+  var umbau = getVal('umbaukosten');
+  var notarpct = getVal('notarpct') / 100;
+  var notareur = kaufpreis * notarpct;
+  document.getElementById('notareur').value = fmt(notareur);
+  document.getElementById('totalkauf').value = fmt(kaufpreis + umbau + notareur);
+
+  var k1 = getVal('kredit1'), z1 = getVal('zins1')/100, t1 = getVal('tilgung1')/100;
+  var monat1 = k1 * (z1 + t1) / 12;
+  document.getElementById('monat1').value = fmt(monat1);
+
+  var k2 = getVal('kredit2'), z2 = getVal('zins2')/100, t2 = getVal('tilgung2')/100;
+  var monat2 = k2 * (z2 + t2) / 12;
+  document.getElementById('monat2').value = fmt(monat2);
+
+  var kreditGesamt = monat1 + monat2;
+  document.getElementById('kreditgesamt').value = fmt(kreditGesamt);
+
+  var fixOhneKredit = getVal('strom') + getVal('grundsteuer') + getVal('wohnsteuer') + getVal('versicherung') + getVal('instandhaltung');
+  document.getElementById('fixohnekredit').value = fmt(fixOhneKredit);
+  document.getElementById('gesamtmonat').value = fmt(kreditGesamt + fixOhneKredit);
+
+  renderBookings();
+  renderDashboard();
+  renderUpcoming();
+  renderCalendar();
+  renderMonthly();
+  renderLiquidity();
+  renderAccount();
+  if (document.getElementById('tax-year')) renderTaxReport();
+}
+
+var SEASON_PRICES = [143,143,143,171,214,314,371,371,286,214,143,143];
+var TAXE_SEJOUR_PP = 1.65;
+var SOURCE_FEES = {Airbnb: 0.03, Booking: 0.15, Direkt: 0};
+
+function getSourceFee(source) { return SOURCE_FEES[source] || 0.03; }
+
+function autoCheckout() {
+  var ci = document.getElementById('b-checkin').value;
+  if (ci) {
+    var d = new Date(ci);
+    d.setDate(d.getDate() + 7);
+    document.getElementById('b-checkout').value = d.toISOString().split('T')[0];
+  }
+  updateTaxe();
+}
+
+function suggestPrice() {
+  var ci = document.getElementById('b-checkin').value;
+  if (!ci) return;
+  var month = new Date(ci).getMonth();
+  var suggested = SEASON_PRICES[month];
+  document.getElementById('price-hint').textContent = '(Saison: ' + suggested + ' \u20ac)';
+  if (parseFloat(document.getElementById('b-preis').value) === 0) {
+    document.getElementById('b-preis').value = suggested;
+  }
+  updateTaxe();
+}
+
+function updateTaxe() {
+  var ci = document.getElementById('b-checkin').value;
+  var co = document.getElementById('b-checkout').value;
+  var gaeste = parseInt(document.getElementById('b-gaeste').value) || 0;
+  if (ci && co && gaeste > 0) {
+    var nights = Math.round((new Date(co) - new Date(ci)) / 86400000);
+    var taxe = nights * gaeste * TAXE_SEJOUR_PP;
+    document.getElementById('b-taxe').value = taxe.toFixed(2) + ' \u20ac';
+  } else {
+    document.getElementById('b-taxe').value = '0,00 \u20ac';
+  }
+}
+
+function addBooking() {
+  var nights = 0;
+  var ci = document.getElementById('b-checkin').value;
+  var co = document.getElementById('b-checkout').value;
+  if (ci && co) nights = Math.round((new Date(co) - new Date(ci)) / 86400000);
+  var gaeste = parseInt(document.getElementById('b-gaeste').value) || 0;
+  var b = {
+    id: Date.now(),
+    typ: document.getElementById('b-typ').value,
+    quelle: document.getElementById('b-quelle').value,
+    gast: document.getElementById('b-gast').value,
+    gaeste: gaeste,
+    checkin: ci,
+    checkout: co,
+    preis: parseFloat(document.getElementById('b-preis').value) || 0,
+    reinigung: parseFloat(document.getElementById('b-reinigung').value) || 0,
+    taxe: nights * gaeste * TAXE_SEJOUR_PP,
+    status: document.getElementById('b-status').value,
+    notizen: document.getElementById('b-notizen').value
+  };
+  if (!b.checkin || !b.checkout) { alert('Bitte Check-In und Check-Out angeben.'); return; }
+  bookings.push(b);
+  localStorage.setItem('fh_bookings', JSON.stringify(bookings));
+  document.getElementById('b-gast').value = '';
+  document.getElementById('b-checkin').value = '';
+  document.getElementById('b-checkout').value = '';
+  document.getElementById('b-notizen').value = '';
+  document.getElementById('b-preis').value = '0';
+  document.getElementById('price-hint').textContent = '';
+  recalc();
+}
+
+var editingId = null;
+
+function editBooking(id) {
+  var b = bookings.find(function(x) { return x.id === id; });
+  if (!b) return;
+  editingId = id;
+  document.getElementById('b-typ').value = b.typ;
+  document.getElementById('b-quelle').value = b.quelle || 'Airbnb';
+  document.getElementById('b-gast').value = b.gast;
+  document.getElementById('b-gaeste').value = b.gaeste || 2;
+  document.getElementById('b-checkin').value = b.checkin;
+  document.getElementById('b-checkout').value = b.checkout;
+  document.getElementById('b-preis').value = b.preis;
+  document.getElementById('b-reinigung').value = b.reinigung;
+  document.getElementById('b-status').value = b.status;
+  document.getElementById('b-notizen').value = b.notizen || '';
+  updateTaxe();
+  document.getElementById('btn-add').classList.add('hidden');
+  document.getElementById('btn-save').classList.remove('hidden');
+  document.getElementById('btn-cancel').classList.remove('hidden');
+}
+
+function saveEditedBooking() {
+  var idx = bookings.findIndex(function(x) { return x.id === editingId; });
+  if (idx === -1) return;
+  var ci = document.getElementById('b-checkin').value;
+  var co = document.getElementById('b-checkout').value;
+  var nights = (ci && co) ? Math.round((new Date(co) - new Date(ci)) / 86400000) : 0;
+  var gaeste = parseInt(document.getElementById('b-gaeste').value) || 0;
+  bookings[idx].typ = document.getElementById('b-typ').value;
+  bookings[idx].quelle = document.getElementById('b-quelle').value;
+  bookings[idx].gast = document.getElementById('b-gast').value;
+  bookings[idx].gaeste = gaeste;
+  bookings[idx].checkin = ci;
+  bookings[idx].checkout = co;
+  bookings[idx].preis = parseFloat(document.getElementById('b-preis').value) || 0;
+  bookings[idx].reinigung = parseFloat(document.getElementById('b-reinigung').value) || 0;
+  bookings[idx].taxe = nights * gaeste * TAXE_SEJOUR_PP;
+  bookings[idx].status = document.getElementById('b-status').value;
+  bookings[idx].notizen = document.getElementById('b-notizen').value;
+  localStorage.setItem('fh_bookings', JSON.stringify(bookings));
+  cancelEdit();
+  recalc();
+}
+
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('b-typ').value = 'Gast';
+  document.getElementById('b-quelle').value = 'Airbnb';
+  document.getElementById('b-gast').value = '';
+  document.getElementById('b-gaeste').value = '2';
+  document.getElementById('b-checkin').value = '';
+  document.getElementById('b-checkout').value = '';
+  document.getElementById('b-preis').value = '0';
+  document.getElementById('b-reinigung').value = '80';
+  document.getElementById('b-status').value = 'Best\u00e4tigt';
+  document.getElementById('b-notizen').value = '';
+  document.getElementById('b-taxe').value = '0,00 \u20ac';
+  document.getElementById('price-hint').textContent = '';
+  document.getElementById('btn-add').classList.remove('hidden');
+  document.getElementById('btn-save').classList.add('hidden');
+  document.getElementById('btn-cancel').classList.add('hidden');
+}
+
+function deleteBooking(id) {
+  bookings = bookings.filter(function(b) { return b.id !== id; });
+  localStorage.setItem('fh_bookings', JSON.stringify(bookings));
+  if (editingId === id) cancelEdit();
+  recalc();
+}
+
+function renderBookings() {
+  var tbody = '';
+  bookings.forEach(function(b, i) {
+    var nights = Math.round((new Date(b.checkout) - new Date(b.checkin)) / 86400000);
+    var brutto = nights * b.preis;
+    var fee = b.typ === 'Gast' ? getSourceFee(b.quelle || 'Airbnb') : 0;
+    var gebuehr = brutto * fee;
+    var taxe = b.taxe || 0;
+    var netto = brutto - b.reinigung - gebuehr;
+    var cls = b.typ === 'Gast' ? 'guest' : (b.typ === 'Personal' ? 'personal' : (b.typ === 'Family & Friends' ? 'family' : 'blocked'));
+    tbody += '<tr class="'+cls+'"><td>'+(i+1)+'</td><td>'+b.typ+'</td><td>'+(b.quelle||'Airbnb')+'</td><td>'+b.gast+'</td>';
+    tbody += '<td>'+b.checkin+'</td><td>'+b.checkout+'</td><td>'+nights+'</td><td>'+fmt(b.preis)+'</td>';
+    tbody += '<td>'+fmt(brutto)+'</td><td>'+fmt(gebuehr)+'</td><td>'+fmt(taxe)+'</td><td>'+fmt(netto)+'</td>';
+    tbody += '<td>'+b.status+'</td><td><button class="btn btn-edit btn-sm" onclick="editBooking('+b.id+')">Edit</button> <button class="btn btn-danger btn-sm" onclick="deleteBooking('+b.id+')">X</button></td></tr>';
+  });
+  document.querySelector('#bookings-table tbody').innerHTML = tbody || '<tr><td colspan="14" style="text-align:center;color:var(--muted)">Noch keine Buchungen</td></tr>';
+}
+
+function findBookingForDate(dateStr) {
+  var d = new Date(dateStr);
+  for (var i = 0; i < bookings.length; i++) {
+    var b = bookings[i];
+    if (b.status === 'Storniert') continue;
+    var ci = new Date(b.checkin);
+    var co = new Date(b.checkout);
+    if (d >= ci && d < co) return b;
+  }
+  return null;
+}
+
+function renderUpcoming() {
+  var today = new Date().toISOString().split('T')[0];
+  var upcoming = bookings.filter(function(b) {
+    return b.status !== 'Storniert' && b.checkin >= today;
+  }).sort(function(a, b) { return a.checkin < b.checkin ? -1 : 1; }).slice(0, 3);
+
+  var container = document.getElementById('upcoming-block');
+  if (upcoming.length === 0) {
+    container.innerHTML = '<div class="upcoming"><h3>Upcoming Next</h3><p class="upcoming-empty">Keine anstehenden Buchungen</p></div>';
+    return;
+  }
+
+  var cards = '';
+  upcoming.forEach(function(b) {
+    var nights = Math.round((new Date(b.checkout) - new Date(b.checkin)) / 86400000);
+    var daysUntil = Math.round((new Date(b.checkin) - new Date(today)) / 86400000);
+    var typeClass = 'type-' + b.typ[0];
+    var ciDate = new Date(b.checkin).toLocaleDateString('de-DE', {day:'numeric', month:'short'});
+    var coDate = new Date(b.checkout).toLocaleDateString('de-DE', {day:'numeric', month:'short', year:'numeric'});
+    var untilText = daysUntil === 0 ? 'Heute' : (daysUntil === 1 ? 'Morgen' : 'in ' + daysUntil + ' Tagen');
+
+    cards += '<div class="upcoming-card ' + typeClass + '">';
+    cards += '<div class="uc-type">' + b.typ + ' &middot; ' + untilText + '</div>';
+    cards += '<div class="uc-guest">' + (b.gast || b.typ) + '</div>';
+    cards += '<div class="uc-dates">' + ciDate + ' &rarr; ' + coDate + '</div>';
+    cards += '<div class="uc-details"><span>' + nights + ' N\u00e4chte</span>';
+    if (b.preis > 0) cards += '<span>' + fmt(b.preis) + '/Nacht</span>';
+    if (b.preis > 0) cards += '<span>' + fmt(nights * b.preis) + ' gesamt</span>';
+    cards += '</div></div>';
+  });
+
+  container.innerHTML = '<div class="upcoming"><h3>Upcoming Next</h3><div class="upcoming-cards">' + cards + '</div></div>';
+}
+
+function renderDashboard() {
+  var today = new Date().toISOString().split('T')[0];
+  var now = new Date();
+  var mStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  var currentBooking = findBookingForDate(today);
+  var statusText = currentBooking ? (currentBooking.gast || currentBooking.typ) : 'Frei';
+  var statusClass = currentBooking ? 'status-occupied' : 'status-free';
+
+  var guestNights = 0, monthRevenue = 0;
+  bookings.forEach(function(b) {
+    if (b.status === 'Storniert' || b.typ !== 'Gast') return;
+    var ci = new Date(b.checkin), co = new Date(b.checkout);
+    var os = ci > mStart ? ci : mStart;
+    var oe = co < mEnd ? co : mEnd;
+    var nights = Math.max(0, Math.round((oe - os) / 86400000));
+    if (nights > 0) { guestNights += nights; monthRevenue += nights * b.preis; }
+  });
+  var occ = daysInMonth > 0 ? Math.round(guestNights / daysInMonth * 100) : 0;
+
+  var html = '';
+  html += '<div class="dash-card"><div class="dash-label">Aktueller Status</div><div class="dash-value '+statusClass+'">'+statusText+'</div>';
+  if (currentBooking) html += '<div class="dash-sub">bis '+new Date(currentBooking.checkout).toLocaleDateString('de-DE',{day:'numeric',month:'short'})+'</div>';
+  html += '</div>';
+  html += '<div class="dash-card"><div class="dash-label">Auslastung '+MONTHS_DE[now.getMonth()]+'</div><div class="dash-value">'+occ+'%</div><div class="dash-sub">'+guestNights+' von '+daysInMonth+' Tagen</div></div>';
+  html += '<div class="dash-card"><div class="dash-label">Umsatz '+MONTHS_DE[now.getMonth()]+'</div><div class="dash-value">'+fmt(monthRevenue)+'</div></div>';
+  document.getElementById('dashboard-block').innerHTML = html;
+}
+
+function getGapDates() {
+  var gaps = {};
+  var sorted = bookings.filter(function(b) { return b.status !== 'Storniert'; })
+    .sort(function(a,b) { return a.checkin < b.checkin ? -1 : 1; });
+  for (var i = 0; i < sorted.length - 1; i++) {
+    var co = new Date(sorted[i].checkout);
+    var nextCi = new Date(sorted[i+1].checkin);
+    var gapDays = Math.round((nextCi - co) / 86400000);
+    if (gapDays >= 1 && gapDays <= 2) {
+      for (var g = 0; g < gapDays; g++) {
+        var gd = new Date(co);
+        gd.setDate(gd.getDate() + g);
+        gaps[gd.toISOString().split('T')[0]] = true;
+      }
+    }
+  }
+  return gaps;
+}
+
+function renderCalendar() {
+  var container = document.getElementById('calendar-container');
+  var html = '';
+  var dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  var gapDates = getGapDates();
+
+  var calMonths = [];
+  for (var m = 9; m <= 12; m++) calMonths.push({year:2026, month:m});
+  for (var m2 = 1; m2 <= 12; m2++) calMonths.push({year:2027, month:m2});
+
+  calMonths.forEach(function(cm) {
+    var year = cm.year, month = cm.month;
+    var daysCount = new Date(year, month, 0).getDate();
+
+    html += '<div class="calendar-month"><h3>'+MONTHS_DE[month-1]+' '+year+'</h3>';
+    html += '<div class="calendar-grid cols-'+daysCount+'">';
+
+    for (var d = 1; d <= daysCount; d++) {
+      var dow = new Date(year, month-1, d).getDay();
+      var we = (dow === 0 || dow === 6) ? ' weekend' : '';
+      html += '<div class="cal-cell day-num'+we+'">'+d+'</div>';
+    }
+    for (var d2 = 1; d2 <= daysCount; d2++) {
+      var dow2 = new Date(year, month-1, d2).getDay();
+      var we2 = (dow2 === 0 || dow2 === 6) ? ' weekend' : '';
+      html += '<div class="cal-cell day-name'+we2+'">'+dayNames[dow2]+'</div>';
+    }
+    for (var d3 = 1; d3 <= daysCount; d3++) {
+      var dateStr = year+'-'+String(month).padStart(2,'0')+'-'+String(d3).padStart(2,'0');
+      var booking = findBookingForDate(dateStr);
+      var status = booking ? booking.typ[0] : '';
+      var cls = status ? ' status-'+status : '';
+      if (!status && gapDates[dateStr]) cls = ' gap';
+      var label = status || (gapDates[dateStr] ? '!' : '');
+      html += '<div class="cal-cell'+cls+'">'+label+'</div>';
+    }
+    for (var d4 = 1; d4 <= daysCount; d4++) {
+      var dateStr2 = year+'-'+String(month).padStart(2,'0')+'-'+String(d4).padStart(2,'0');
+      var booking2 = findBookingForDate(dateStr2);
+      var name = booking2 ? booking2.gast : '';
+      html += '<div class="cal-cell guest-name">'+name+'</div>';
+    }
+
+    html += '</div></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function renderMonthly() {
+  var fixMonat = getFixMonat();
+  var tbody = '';
+  var totalGuestNights = 0, totalPersonalNights = 0, totalBrutto = 0, totalVar = 0, totalGewinn = 0;
+
+  var monthlyPlan = [];
+  for (var mm = 8; mm <= 11; mm++) monthlyPlan.push({year:2026, mIdx:mm});
+  for (var mm2 = 0; mm2 <= 11; mm2++) monthlyPlan.push({year:2027, mIdx:mm2});
+
+  monthlyPlan.forEach(function(item) {
+    var year = item.year, mIdx = item.mIdx;
+    var monat = MONTHS_DE[mIdx];
+      var daysAvail = DAYS_IN_MONTH[mIdx];
+      var guestNights = 0, persNights = 0, brutto = 0, varKosten = 0;
+
+      bookings.forEach(function(b) {
+        if (b.status === 'Storniert') return;
+        var ci = new Date(b.checkin), co = new Date(b.checkout);
+        var monthStart = new Date(year, mIdx, 1);
+        var monthEnd = new Date(year, mIdx + 1, 1);
+        var overlapStart = ci > monthStart ? ci : monthStart;
+        var overlapEnd = co < monthEnd ? co : monthEnd;
+        var nights = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
+
+        if (nights > 0) {
+          if (b.typ === 'Gast') {
+            guestNights += nights;
+            var rev = nights * b.preis;
+            brutto += rev;
+            varKosten += rev * getSourceFee(b.quelle || 'Airbnb') + b.reinigung;
+          } else if (b.typ === 'Personal' || b.typ === 'Family & Friends') {
+            persNights += nights;
+          }
+        }
+      });
+
+      var netto = brutto - varKosten;
+      var gewinn = netto - fixMonat;
+      totalGuestNights += guestNights; totalPersonalNights += persNights;
+      totalBrutto += brutto; totalVar += varKosten; totalGewinn += gewinn;
+      var auslastung = daysAvail > 0 ? (guestNights + persNights) / daysAvail : 0;
+
+      tbody += '<tr><td>'+monat+'</td><td>'+year+'</td><td>'+guestNights+'</td><td>'+persNights+'</td>';
+      tbody += '<td>'+daysAvail+'</td><td>'+pct(auslastung)+'</td><td>'+fmt(brutto)+'</td><td>'+fmt(varKosten)+'</td>';
+      tbody += '<td>'+fmt(netto)+'</td><td>'+fmt(fixMonat)+'</td>';
+      tbody += '<td style="font-weight:600;color:'+(gewinn>=0?'#198754':'#dc3545')+'">'+fmt(gewinn)+'</td></tr>';
+  });
+
+  document.querySelector('#monthly-table tbody').innerHTML = tbody;
+  document.getElementById('annual-summary').innerHTML =
+    '<div class="summary-card"><div class="label">Gast-N\u00e4chte (gesamt)</div><div class="value">'+totalGuestNights+'</div></div>'+
+    '<div class="summary-card"><div class="label">Personal N\u00e4chte</div><div class="value">'+totalPersonalNights+'</div></div>'+
+    '<div class="summary-card"><div class="label">Bruttoumsatz</div><div class="value">'+fmt(totalBrutto)+'</div></div>'+
+    '<div class="summary-card"><div class="label">Gesamtgewinn</div><div class="value '+(totalGewinn>=0?'positive':'negative')+'">'+fmt(totalGewinn)+'</div></div>';
+}
+
+function getExpensesForMonth(year, mIdx) {
+  var total = 0;
+  expenses.forEach(function(e) {
+    var d = new Date(e.datum);
+    if (d.getFullYear() === year && d.getMonth() === mIdx) {
+      total += e.betrag;
+    }
+  });
+  return total;
+}
+
+function renderLiquidity() {
+  var fixMonat = getFixMonat();
+  var kumuliert = getVal('startkapital');
+  var tbody = '';
+
+  var liqMonths = [];
+  for (var m = 8; m <= 11; m++) liqMonths.push({year:2026, mIdx:m});
+  for (var m2 = 0; m2 <= 11; m2++) liqMonths.push({year:2027, mIdx:m2});
+
+  liqMonths.forEach(function(item) {
+    var year = item.year, mIdx = item.mIdx;
+    var monat = MONTHS_DE[mIdx];
+    var einnahmen = 0, varAusgaben = 0;
+
+    bookings.forEach(function(b) {
+      if (b.status === 'Storniert') return;
+      var ci = new Date(b.checkin), co = new Date(b.checkout);
+      var monthStart = new Date(year, mIdx, 1);
+      var monthEnd = new Date(year, mIdx + 1, 1);
+      var overlapStart = ci > monthStart ? ci : monthStart;
+      var overlapEnd = co < monthEnd ? co : monthEnd;
+      var nights = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
+
+      if (nights > 0 && b.typ === 'Gast') {
+        var rev = nights * b.preis;
+        einnahmen += rev;
+        varAusgaben += rev * getSourceFee(b.quelle || 'Airbnb') + b.reinigung;
+      }
+    });
+
+    var sonstige = getExpensesForMonth(year, mIdx);
+    var ausgaben = varAusgaben + fixMonat;
+    var saldo = einnahmen - ausgaben - sonstige;
+    kumuliert += saldo;
+
+    tbody += '<tr><td>'+monat+' '+year+'</td><td>'+fmt(einnahmen)+'</td><td>'+fmt(ausgaben)+'</td><td>'+fmt(sonstige)+'</td>';
+    tbody += '<td style="font-weight:600;color:'+(saldo>=0?'#198754':'#dc3545')+'">'+fmt(saldo)+'</td>';
+    tbody += '<td style="font-weight:600;color:'+(kumuliert>=0?'#198754':'#dc3545')+'">'+fmt(kumuliert)+'</td></tr>';
+  });
+
+  document.querySelector('#liquidity-table tbody').innerHTML = tbody;
+}
+
+function addExpense() {
+  var e = {
+    id: Date.now(),
+    datum: document.getElementById('e-datum').value,
+    kategorie: document.getElementById('e-kategorie').value,
+    beschreibung: document.getElementById('e-beschreibung').value,
+    betrag: parseFloat(document.getElementById('e-betrag').value) || 0
+  };
+  if (!e.datum) { alert('Bitte Datum angeben.'); return; }
+  if (e.betrag <= 0) { alert('Bitte Betrag angeben.'); return; }
+  expenses.push(e);
+  localStorage.setItem('fh_expenses', JSON.stringify(expenses));
+  document.getElementById('e-beschreibung').value = '';
+  document.getElementById('e-betrag').value = '0';
+  recalc();
+}
+
+function deleteExpense(id) {
+  expenses = expenses.filter(function(e) { return e.id !== id; });
+  localStorage.setItem('fh_expenses', JSON.stringify(expenses));
+  recalc();
+}
+
+function renderAccount() {
+  var entries = [];
+
+  bookings.forEach(function(b) {
+    if (b.status === 'Storniert' || b.typ !== 'Gast') return;
+    var nights = Math.round((new Date(b.checkout) - new Date(b.checkin)) / 86400000);
+    var brutto = nights * b.preis;
+    var fee = getSourceFee(b.quelle || 'Airbnb');
+    var gebuehr = brutto * fee;
+    var netto = brutto - b.reinigung - gebuehr;
+    entries.push({datum: b.checkout, typ: 'Einnahme', kategorie: 'Buchung', beschreibung: b.gast + ' (' + nights + ' N.)', einnahme: netto, ausgabe: 0});
+  });
+
+  expenses.forEach(function(e) {
+    entries.push({datum: e.datum, typ: 'Ausgabe', kategorie: e.kategorie, beschreibung: e.beschreibung, einnahme: 0, ausgabe: e.betrag, id: e.id});
+  });
+
+  entries.sort(function(a, b) { return a.datum < b.datum ? -1 : (a.datum > b.datum ? 1 : 0); });
+
+  var totalEinnahmen = 0, totalAusgaben = 0;
+  var saldo = getVal('startkapital');
+  var tbody = '';
+
+  tbody += '<tr style="font-weight:600;background:var(--primary-light)"><td>Start</td><td>Startkapital</td><td></td><td></td><td>'+fmt(saldo)+'</td><td></td><td>'+fmt(saldo)+'</td><td></td></tr>';
+
+  entries.forEach(function(e) {
+    saldo += e.einnahme - e.ausgabe;
+    totalEinnahmen += e.einnahme;
+    totalAusgaben += e.ausgabe;
+    var deleteBtn = e.id ? '<button class="btn btn-danger btn-sm" onclick="deleteExpense('+e.id+')">X</button>' : '';
+    tbody += '<tr><td>'+e.datum+'</td><td>'+e.typ+'</td><td>'+e.kategorie+'</td><td>'+e.beschreibung+'</td>';
+    tbody += '<td style="color:#198754">'+(e.einnahme > 0 ? fmt(e.einnahme) : '')+'</td>';
+    tbody += '<td style="color:#dc3545">'+(e.ausgabe > 0 ? fmt(e.ausgabe) : '')+'</td>';
+    tbody += '<td style="font-weight:600;color:'+(saldo>=0?'#198754':'#dc3545')+'">'+fmt(saldo)+'</td>';
+    tbody += '<td>'+deleteBtn+'</td></tr>';
+  });
+
+  document.querySelector('#account-table tbody').innerHTML = tbody;
+  document.getElementById('account-summary').innerHTML =
+    '<div class="summary-card"><div class="label">Gesamteinnahmen</div><div class="value positive">'+fmt(totalEinnahmen)+'</div></div>'+
+    '<div class="summary-card"><div class="label">Gesamtausgaben</div><div class="value negative">'+fmt(totalAusgaben)+'</div></div>'+
+    '<div class="summary-card"><div class="label">Aktueller Kontostand</div><div class="value '+(saldo>=0?'positive':'negative')+'">'+fmt(saldo)+'</div></div>';
+}
+
+function analyzePdf(file) {
+  if (!file) return;
+  var status = document.getElementById('pdf-status');
+  status.value = 'Analysiere...';
+  uploadToGithub(file);
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var typedArray = new Uint8Array(ev.target.result);
+    pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
+      var textPromises = [];
+      for (var i = 1; i <= Math.min(pdf.numPages, 3); i++) {
+        textPromises.push(pdf.getPage(i).then(function(page) {
+          return page.getTextContent().then(function(content) {
+            return content.items.map(function(item) { return item.str; }).join(' ');
+          });
+        }));
+      }
+      return Promise.all(textPromises);
+    }).then(function(pages) {
+      var text = pages.join('\n');
+      parseInvoice(text);
+      status.value = 'Erkannt - bitte pr\u00fcfen';
+    }).catch(function(err) {
+      status.value = 'Fehler: ' + err.message;
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseInvoice(text) {
+  var foundDate = extractDate(text);
+  var foundAmount = extractAmount(text);
+  var foundDesc = extractDescription(text);
+  var foundCategory = extractCategory(text);
+
+  if (foundDate) document.getElementById('e-datum').value = foundDate;
+  if (foundAmount) document.getElementById('e-betrag').value = foundAmount.toFixed(2);
+  if (foundDesc) document.getElementById('e-beschreibung').value = foundDesc;
+  if (foundCategory) document.getElementById('e-kategorie').value = foundCategory;
+}
+
+function extractDate(text) {
+  var patterns = [
+    /(\d{2})[.\/](\d{2})[.\/](\d{4})/,
+    /(\d{4})-(\d{2})-(\d{2})/,
+    /(\d{1,2})\s+(janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre)\s+(\d{4})/i,
+    /(\d{1,2})\.\s*(Januar|Februar|M[aä]rz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s+(\d{4})/i
+  ];
+  var frMonths = {janvier:1,f\u00e9vrier:2,fevrier:2,mars:3,avril:4,mai:5,juin:6,juillet:7,ao\u00fbt:8,aout:8,septembre:9,octobre:10,novembre:11,d\u00e9cembre:12,decembre:12};
+  var deMonths = {januar:1,februar:2,m\u00e4rz:3,maerz:3,april:4,mai:5,juni:6,juli:7,august:8,september:9,oktober:10,november:11,dezember:12};
+
+  var m = text.match(patterns[0]);
+  if (m) {
+    var day = parseInt(m[1]), mon = parseInt(m[2]), yr = parseInt(m[3]);
+    if (day > 12 && mon <= 12) return yr+'-'+String(mon).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+    if (mon > 12 && day <= 12) return yr+'-'+String(day).padStart(2,'0')+'-'+String(mon).padStart(2,'0');
+    return yr+'-'+String(mon).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+  }
+  m = text.match(patterns[1]);
+  if (m) return m[0];
+  m = text.match(patterns[2]);
+  if (m) {
+    var mo = frMonths[m[2].toLowerCase()] || 1;
+    return m[3]+'-'+String(mo).padStart(2,'0')+'-'+String(parseInt(m[1])).padStart(2,'0');
+  }
+  m = text.match(patterns[3]);
+  if (m) {
+    var mo2 = deMonths[m[2].toLowerCase()] || 1;
+    return m[3]+'-'+String(mo2).padStart(2,'0')+'-'+String(parseInt(m[1])).padStart(2,'0');
+  }
+  return '';
+}
+
+function extractAmount(text) {
+  var totalPatterns = [
+    /(?:total\s*(?:ttc|tva incl)?|montant\s*(?:total|ttc|net)|gesamtbetrag|gesamtsumme|endbetrag|rechnungsbetrag|amount\s*due|total\s*amount)[:\s]*([0-9.,\s]+)\s*(?:\u20ac|EUR|eur)/i,
+    /(?:total\s*(?:ttc|tva incl)?|montant\s*(?:total|ttc|net)|gesamtbetrag|gesamtsumme|endbetrag|rechnungsbetrag|amount\s*due|total\s*amount)[:\s]*(?:\u20ac|EUR|eur)?\s*([0-9.,\s]+)/i,
+    /(?:\u20ac|EUR)\s*([0-9]+[.,][0-9]{2})\b/,
+    /([0-9]+[.,][0-9]{2})\s*(?:\u20ac|EUR)/
+  ];
+
+  for (var i = 0; i < totalPatterns.length; i++) {
+    var m = text.match(totalPatterns[i]);
+    if (m) {
+      var val = m[1].replace(/\s/g, '').replace(',', '.');
+      var num = parseFloat(val);
+      if (num > 0 && num < 1000000) return num;
+    }
+  }
+
+  var amounts = [];
+  var re = /([0-9]+[.,][0-9]{2})\s*(?:\u20ac|EUR)|(?:\u20ac|EUR)\s*([0-9]+[.,][0-9]{2})/g;
+  var match;
+  while ((match = re.exec(text)) !== null) {
+    var v = (match[1] || match[2]).replace(',', '.');
+    var n = parseFloat(v);
+    if (n > 0) amounts.push(n);
+  }
+  if (amounts.length > 0) return Math.max.apply(null, amounts);
+  return 0;
+}
+
+function extractDescription(text) {
+  var invoiceMatch = text.match(/(?:facture|rechnung|invoice)[:\s#]*([A-Z0-9\-\/]+)/i);
+  var lines = text.split(/\s{3,}|\n/);
+  var vendor = '';
+  for (var i = 0; i < Math.min(lines.length, 5); i++) {
+    var line = lines[i].trim();
+    if (line.length > 3 && line.length < 60 && !/^\d+$/.test(line) && !/facture|rechnung|invoice|datum|date/i.test(line)) {
+      vendor = line;
+      break;
+    }
+  }
+  if (invoiceMatch && vendor) return vendor + ' - ' + invoiceMatch[0];
+  if (vendor) return vendor;
+  if (invoiceMatch) return invoiceMatch[0];
+  return file ? file.name.replace('.pdf', '') : '';
+}
+
+function extractCategory(text) {
+  var lower = text.toLowerCase();
+  if (/m[oö]bel|furniture|meuble|canap|sofa|lit|table|stuhl|schrank|ikea|matratze/i.test(lower)) return 'M\u00f6bel';
+  if (/renovierung|renovation|travaux|peinture|umbau|bad|k[uü]che|boden|wand|fassade/i.test(lower)) return 'Renovierung';
+  if (/inventory|inventar|ausstattung|geschirr|besteck|handtuch|bettw|kissen|decke|vorrat/i.test(lower)) return 'Inventory';
+  return 'Sonstiges';
+}
+
+function showTab(name, btn) {
+  document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('nav button').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+  recalc();
+}
+
+var _k = [116,113,113,110,108];
+var _v = [103,102,108,115,116,113,120];
+function _d(a) { return a.map(function(c) { return String.fromCharCode(c - 5); }).join(''); }
+
+function doLogin() {
+  var user = document.getElementById('login-user').value;
+  var pass = document.getElementById('login-pass').value;
+  if (user === _d(_k) && pass === _d(_v)) {
+    sessionStorage.setItem('fh_logged_in', '1');
+    document.getElementById('login-screen').remove();
+    init();
+  } else {
+    document.getElementById('login-error').textContent = 'Falscher Benutzername oder Passwort.';
+  }
+}
+
+function exportExcel() {
+  var rows = [['Datum','Typ','Kategorie','Beschreibung','Einnahme (\u20ac)','Ausgabe (\u20ac)','Saldo (\u20ac)']];
+  var saldo = getVal('startkapital');
+  rows.push(['','Startkapital','','',saldo.toFixed(2),'',saldo.toFixed(2)]);
+
+  var entries = [];
+  bookings.forEach(function(b) {
+    if (b.status === 'Storniert' || b.typ !== 'Gast') return;
+    var nights = Math.round((new Date(b.checkout) - new Date(b.checkin)) / 86400000);
+    var brutto = nights * b.preis;
+    var gebuehr = brutto * getSourceFee(b.quelle || 'Airbnb');
+    var netto = brutto - b.reinigung - gebuehr;
+    entries.push({datum:b.checkout, typ:'Einnahme', kategorie:'Buchung', beschreibung:b.gast+' ('+nights+' N.)', einnahme:netto, ausgabe:0});
+  });
+  expenses.forEach(function(e) {
+    entries.push({datum:e.datum, typ:'Ausgabe', kategorie:e.kategorie, beschreibung:e.beschreibung, einnahme:0, ausgabe:e.betrag});
+  });
+  entries.sort(function(a,b) { return a.datum < b.datum ? -1 : (a.datum > b.datum ? 1 : 0); });
+
+  entries.forEach(function(e) {
+    saldo += e.einnahme - e.ausgabe;
+    rows.push([e.datum, e.typ, e.kategorie, e.beschreibung, e.einnahme > 0 ? e.einnahme.toFixed(2) : '', e.ausgabe > 0 ? e.ausgabe.toFixed(2) : '', saldo.toFixed(2)]);
+  });
+
+  var csv = rows.map(function(r) {
+    return r.map(function(c) { return '"' + String(c).replace(/"/g,'""') + '"'; }).join(';');
+  }).join('\n');
+
+  var BOM = '\uFEFF';
+  var blob = new Blob([BOM + csv], {type:'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'kontostand_export.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function uploadToGithub(file) {
+  var token = document.getElementById('gh-token').value;
+  var repo = document.getElementById('gh-repo').value;
+  if (!token || !repo) return;
+  var status = document.getElementById('pdf-status');
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var base64 = btoa(new Uint8Array(ev.target.result).reduce(function(d,b){return d+String.fromCharCode(b);},''));
+    var path = 'invoices/' + new Date().toISOString().split('T')[0] + '_' + file.name;
+    fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
+      method: 'PUT',
+      headers: {'Authorization': 'token ' + token, 'Content-Type': 'application/json'},
+      body: JSON.stringify({message: 'Upload invoice: ' + file.name, content: base64})
+    }).then(function(r) {
+      if (r.ok) { status.value = 'Gespeichert in GitHub'; listGhFiles(); }
+      else r.json().then(function(d) { status.value = 'GitHub Fehler: ' + (d.message||r.status); });
+    }).catch(function(e) { status.value = 'Upload fehlgeschlagen'; });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function listGhFiles() {
+  var token = document.getElementById('gh-token').value;
+  var repo = document.getElementById('gh-repo').value;
+  var container = document.getElementById('gh-files');
+  if (!token || !repo) { container.innerHTML = ''; return; }
+  fetch('https://api.github.com/repos/' + repo + '/contents/invoices', {
+    headers: {'Authorization': 'token ' + token}
+  }).then(function(r) { return r.ok ? r.json() : []; })
+  .then(function(files) {
+    if (!files.length) { container.innerHTML = '<p style="font-size:12px;color:var(--muted)">Keine Rechnungen gespeichert</p>'; return; }
+    var html = '<p style="font-size:12px;color:var(--muted);margin-bottom:8px"><strong>' + files.length + ' Rechnungen</strong> im Repository:</p><ul style="font-size:12px;list-style:none;max-height:150px;overflow-y:auto">';
+    files.forEach(function(f) {
+      html += '<li style="padding:4px 0;border-bottom:1px solid var(--border)"><a href="'+f.html_url+'" target="_blank" style="color:#5856D6">'+f.name+'</a> <span style="color:var(--muted)">('+(f.size/1024).toFixed(0)+' KB)</span></li>';
+    });
+    html += '</ul>';
+    container.innerHTML = html;
+  }).catch(function() { container.innerHTML = ''; });
+}
+
+function renderTaxReport() {
+  var year = parseInt(document.getElementById('tax-year').value);
+  var brutto=0, fees=0, cleaning=0, taxeS=0, nts=0;
+  bookings.forEach(function(b) {
+    if (b.status==='Storniert'||b.typ!=='Gast') return;
+    var ci=new Date(b.checkin), co=new Date(b.checkout);
+    var s=new Date(year,0,1), e=new Date(year+1,0,1);
+    var os=ci>s?ci:s, oe=co<e?co:e;
+    var n=Math.max(0,Math.round((oe-os)/86400000));
+    if(n>0){var r=n*b.preis;brutto+=r;fees+=r*getSourceFee(b.quelle||'Airbnb');cleaning+=b.reinigung;taxeS+=b.taxe||0;nts+=n;}
+  });
+  var st=getVal('strom')*12,gst=getVal('grundsteuer')*12,vs=getVal('versicherung')*12,ih=getVal('instandhaltung')*12;
+  var zn=getVal('kredit1')*getVal('zins1')/100+getVal('kredit2')*getVal('zins2')/100;
+  var ep=0; expenses.forEach(function(x){if(new Date(x.datum).getFullYear()===year)ep+=x.betrag;});
+  var tc=fees+cleaning+st+gst+vs+ih+zn+ep, res=brutto-tc;
+  document.getElementById('tax-revenue').innerHTML='<table><tr><td>Loyers bruts</td><td style="text-align:right;font-weight:600">'+fmt(brutto)+'</td></tr><tr><td>Nuits</td><td style="text-align:right">'+nts+'</td></tr></table>';
+  document.getElementById('tax-charges').innerHTML='<table><tr><td>Frais plateforme</td><td style="text-align:right">'+fmt(fees)+'</td></tr><tr><td>M\u00e9nage</td><td style="text-align:right">'+fmt(cleaning)+'</td></tr><tr><td>Int\u00e9r\u00eats</td><td style="text-align:right">'+fmt(zn)+'</td></tr><tr><td>Taxe fonci\u00e8re</td><td style="text-align:right">'+fmt(gst)+'</td></tr><tr><td>Assurance</td><td style="text-align:right">'+fmt(vs)+'</td></tr><tr><td>\u00c9lectricit\u00e9/Eau</td><td style="text-align:right">'+fmt(st)+'</td></tr><tr><td>Entretien</td><td style="text-align:right">'+fmt(ih)+'</td></tr><tr><td>Autres</td><td style="text-align:right">'+fmt(ep)+'</td></tr><tr style="font-weight:700"><td>Total</td><td style="text-align:right">'+fmt(tc)+'</td></tr></table>';
+  document.getElementById('tax-result').innerHTML='<table><tr style="font-weight:700;font-size:16px"><td>R\u00e9sultat net</td><td style="text-align:right;color:'+(res>=0?'#198754':'#dc3545')+'">'+fmt(res)+'</td></tr></table>';
+  document.getElementById('tax-sejour').innerHTML='<table><tr><td>Taxe de s\u00e9jour collect\u00e9e</td><td style="text-align:right;font-weight:600">'+fmt(taxeS)+'</td></tr></table>';
+}
+
+function exportTaxReport() {
+  var year=parseInt(document.getElementById('tax-year').value);
+  var brutto=0,fees=0,cleaning=0,taxeS=0;
+  bookings.forEach(function(b){
+    if(b.status==='Storniert'||b.typ!=='Gast')return;
+    var ci=new Date(b.checkin),co=new Date(b.checkout);
+    var s=new Date(year,0,1),e=new Date(year+1,0,1);
+    var os=ci>s?ci:s,oe=co<e?co:e;
+    var n=Math.max(0,Math.round((oe-os)/86400000));
+    if(n>0){brutto+=n*b.preis;fees+=n*b.preis*getSourceFee(b.quelle||'Airbnb');cleaning+=b.reinigung;taxeS+=b.taxe||0;}
+  });
+  var zn=getVal('kredit1')*getVal('zins1')/100+getVal('kredit2')*getVal('zins2')/100;
+  var st=getVal('strom')*12,gst=getVal('grundsteuer')*12,vs=getVal('versicherung')*12,ih=getVal('instandhaltung')*12;
+  var ep=0;expenses.forEach(function(x){if(new Date(x.datum).getFullYear()===year)ep+=x.betrag;});
+  var tc=fees+cleaning+st+gst+vs+ih+zn+ep;
+  var rows=[['Poste','EUR'],['Loyers bruts',brutto],['Frais plateforme',fees],['Menage',cleaning],['Interets emprunt',zn],['Taxe fonciere',gst],['Assurance',vs],['Electricite',st],['Entretien',ih],['Autres depenses',ep],['Total charges',tc],['Resultat foncier net',brutto-tc],[''],['Taxe de sejour',taxeS]];
+  var csv=rows.map(function(r){return r.map(function(c){return '"'+(typeof c==='number'?c.toFixed(2):String(c||'')).replace(/"/g,'""')+'"';}).join(';');}).join('\n');
+  var blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  var u=URL.createObjectURL(blob);var a=document.createElement('a');a.href=u;a.download='regime_reel_'+year+'.csv';a.click();URL.revokeObjectURL(u);
+}
+
+function doLogout() {
+  sessionStorage.removeItem('fh_logged_in');
+  location.reload();
+}
+
+if (sessionStorage.getItem('fh_logged_in') === '1') {
+  document.getElementById('login-screen').remove();
+  init();
+}
+</script>
+</body>
+</html>
